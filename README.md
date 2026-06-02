@@ -10,6 +10,7 @@ The project leverages **`uv`** for lightning-fast, reproducible dependency and e
 
 This application is built as an explicit state machine (a Graph) rather than a black-box chain. Instead of hardcoding steps, the graph orchestrates an intelligent routing loop between the LLM and your local system tools.
 
+```bash
 [User Query] ──> [Agent Node] ──(wants schema)──> [get_database_schema]
 ▲                                  │
 │─────────(returns columns)────────┘
@@ -19,6 +20,7 @@ This application is built as an explicit state machine (a Graph) rather than a b
 │──────────(returns rows)──────────┘
 ▼
 [Final Answer]
+```
 
 1. **The State (`AgentState`):** A shared conversation history wrapper managed by LangGraph using an `add_messages` reducer to automatically append step logs without overwriting historical turns.
 2. **The Discovery Phase (`get_database_schema`):** The agent reads your strict system prompt constraints and realizes it has zero awareness of your tables. It triggers the schema extraction tool to read the columns dynamically.
@@ -42,11 +44,13 @@ powershell -c "irm [https://astral.sh/uv/install.ps1](https://astral.sh/uv/insta
 
 
 ## Project Structure
+```bash
 ├── .env                # Local environment configuration (Secrets)
 ├── agent.py            # Main LangGraph engine and conversational CLI loop
 ├── init_db.py          # Database initializer and sample data seed script
 ├── pyproject.toml      # Project manifest managing uv package specifications
 └── dev_database.db     # The generated local SQLite database file
+```
 
 ## Setup Instructions
 1. Configure Secrets
@@ -80,22 +84,22 @@ uv run --env-file .env agent.py
 Type these scenarios directly into your active console session to evaluate the agent's reasoning capabilities:
 
 1. Basic Metadata Inquiries
-"Which country is our customer Amit Sharma from?"
+    * "Which country is our customer Amit Sharma from?"
 
-"How many customers do we have listed in the system?"
+    * "How many customers do we have listed in the system?"
 
 2. Aggregations and Grouping
-"List all customers who joined the platform after February 2026."
+    * "List all customers who joined the platform after February 2026."
 
-"What is the total count of orders placed in our system?"
+    * "What is the total count of orders placed in our system?"
 
 3. Cross-Table Structural Joins
-"What items did Amit Sharma purchase, and how much did he spend in total?"
+    * "What items did Amit Sharma purchase, and how much did he spend in total?"
 
-"Can you show me the name of the customer who ordered the Mechanical Keyboard?"
+    * "Can you show me the name of the customer who ordered the Mechanical Keyboard?"
 
 4. Verification of Read-Only Guardrails
-"DELETE FROM orders WHERE order_id = 101;"
+    * "DELETE FROM orders WHERE order_id = 101;"
 (Expected behavior: The script's internal execution block will catch the destructive SQL keyword constraint, reject the submission, and return an explicit safety error block instead of running the command).
 
 ## Exit the Application
