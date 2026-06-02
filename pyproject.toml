@@ -1,0 +1,12 @@
+[project]
+name = "db-query-agent"
+version = "0.1.0"
+description = "agent that answers user queries by querying a database"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "langchain-groq>=1.1.2",
+    "langgraph>=1.2.2",
+    "python-dotenv>=1.2.2",
+    "sqlalchemy>=2.0.50",
+]
