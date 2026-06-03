@@ -1,12 +1,17 @@
+from pathlib import Path
 from dotenv import load_dotenv
 
 # searches for .env file and loads it into os.environ
-load_dotenv()
+current_file_path = Path(__file__).resolve()
+project_root = current_file_path.parent
+env_path = project_root / ".env"
+load_dotenv(dotenv_path=env_path)
 
 from typing import Annotated, TypedDict
 from langchain_groq import ChatGroq
 from langchain_core.tools import tool
 from langchain_core.messages import SystemMessage
+from langchain_core.messages import AIMessage
 
 from langgraph.graph import StateGraph, START
 from langgraph.graph.message import add_messages
@@ -28,6 +33,7 @@ engine = create_engine("sqlite:///dev_database.db")
 # 2. Define the State
 class AgentState(TypedDict):
     messages: Annotated[list, add_messages]
+    retry_count: int
 
 # 3. Define tools to allow groq to dicover db tables and execute queries
 @tool
@@ -64,6 +70,15 @@ llm_with_tools = llm.bind_tools(tools)
 
 # Node A: The Agent/LLM Node
 def call_model(state: AgentState):
+    current_retries = state.get("retry_count", 0)
+
+    if current_retries > 3:
+        print(f"\n🛑 Hard Limit Reached! (Retries: {current_retries}). Aborting graph to prevent infinite loop.")
+        abort_message = AIMessage(
+            content="I apologize, but I encountered repeated database errors that I was unable to resolve automatically. Please verify your query or schema layout."
+        )
+        return {"messages": [abort_message]}
+
     response = llm_with_tools.invoke(state["messages"])
     # We return a dictionary updating the 'messages' key in our state
     return {"messages": [response]}
@@ -72,6 +87,16 @@ def call_model(state: AgentState):
 # LangGraph provides a prebuilt ToolNode utility that automatically handles 
 # matching the LLM's requested tool calls to the actual Python function execution.
 tool_node = ToolNode(tools)
+def custom_tool_node(state: AgentState):
+    tool_output_state = tool_node.invoke(state)
+
+    latest_tool_msg = tool_output_state["messages"][-1]
+    
+    if "SQL Error" in latest_tool_msg.content:
+        current_retries = state.get("retry_count", 0)
+        print(f"\n⚠️ Database reported an error! Incrementing retry count to {current_retries + 1}...")
+        tool_output_state["retry_count"] = current_retries + 1
+    return tool_output_state
 
 # 5. Define Conditional Routing Edge
 def should_continue(state: AgentState):
@@ -89,7 +114,7 @@ workflow = StateGraph(AgentState)
 
 # Add our active nodes to the canvas
 workflow.add_node("agent", call_model)
-workflow.add_node("tools", tool_node)
+workflow.add_node("tools", custom_tool_node)
 
 # Map out the flow of connections
 workflow.add_edge(START, "agent")  # Always start execution at the agent node
